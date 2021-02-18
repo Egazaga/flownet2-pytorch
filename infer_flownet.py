@@ -23,10 +23,12 @@ from utils import flow_utils, tools
 # fp32 copy of parameters for update
 global param_copy
 
-if __name__ == '__main__':
+
+def infer_flownet(in_path, out_path, reverse):
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--reverse', action='store_true', default=False)
+    parser.add_argument('--model', default="FlowNet2")
+    parser.add_argument('--reverse', action='store_true', default=reverse)
     parser.add_argument('--start_epoch', type=int, default=1)
     parser.add_argument('--total_epochs', type=int, default=10000)
     parser.add_argument('--batch_size', '-b', type=int, default=8, help="Batch size")
@@ -46,23 +48,24 @@ if __name__ == '__main__':
 
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--name', default='run', type=str, help='a name to append to the save directory')
-    parser.add_argument('--save', '-s', default='./work', type=str, help='directory for saving')
+    parser.add_argument('--in_path', default=in_path, type=str)
+    parser.add_argument('--save', '-s', default=out_path, type=str, help='directory for saving')
 
     parser.add_argument('--validation_frequency', type=int, default=5, help='validate every n epochs')
     parser.add_argument('--validation_n_batches', type=int, default=-1)
     parser.add_argument('--render_validation', action='store_true',
                         help='run inference (save flows to file) and every validation_frequency epoch')
 
-    parser.add_argument('--inference', action='store_true')
+    parser.add_argument('--inference', default=True)
     parser.add_argument('--inference_visualize', action='store_true',
                         help="visualize the optical flow during inference")
     parser.add_argument('--inference_size', type=int, nargs='+', default=[-1, -1],
                         help='spatial size divisible by 64. default (-1,-1) - largest possible valid size would be used')
     parser.add_argument('--inference_batch_size', type=int, default=1)
     parser.add_argument('--inference_n_batches', type=int, default=-1)
-    parser.add_argument('--save_flow', action='store_true', help='save predicted flows to file')
+    parser.add_argument('--save_flow', default=True)
 
-    parser.add_argument('--resume', default='', type=str, metavar='PATH',
+    parser.add_argument('--resume', default='./FlowNet2_checkpoint.pth.tar', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
     parser.add_argument('--log_frequency', '--summ_iter', type=int, default=1, help="Log every n batches")
 
@@ -148,8 +151,7 @@ if __name__ == '__main__':
 
         if exists(args.inference_dataset_root):
             inference_dataset = datasets.ImagesFromFolder(args, is_cropped=False, is_reversed=args.reverse,
-                                                          **tools.kwargs_from_args(args, 'inference_dataset'))
-            block.log('Inference Dataset: {}'.format(args.inference_dataset))
+                                                          root=args.in_path)
             block.log(
                 'Inference Input: {}'.format(' '.join([str([d for d in x.size()]) for x in inference_dataset[0][0]])))
             block.log(
