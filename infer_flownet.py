@@ -15,10 +15,8 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import datasets
-import losses
-import models
-from utils import flow_utils, tools
+from . import datasets, losses, models
+from .utils import flow_utils, tools
 
 # fp32 copy of parameters for update
 global param_copy
