@@ -76,7 +76,7 @@ def infer_flownet(in_path, out_path, reverse):
         # Print all arguments, color the non-defaults
         for argument, value in sorted(vars(args).items()):
             reset = colorama.Style.RESET_ALL
-            color = reset if value == defaults[argument] else colorama.Fore.MAGENTA
+            color = colorama.Fore.MAGENTA
             block.log('{}{}: {}{}'.format(color, argument, value, reset))
 
         args.model_class = tools.module_to_dict(models)[args.model]
