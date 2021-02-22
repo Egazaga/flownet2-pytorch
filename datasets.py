@@ -371,9 +371,13 @@ class ImagesFromFolder(data.Dataset):
         img1 = frame_utils.read_gen(self.image_list[index][0])
         img2 = frame_utils.read_gen(self.image_list[index][1])
         image_size = img1.shape[:2]
-        h = 4  # TODO calculate
-        img1 = np.pad(img1, ((h, h), (0, 0), (0, 0)), "constant", constant_values=0)
-        img2 = np.pad(img2, ((h, h), (0, 0), (0, 0)), "constant", constant_values=0)
+        h, w = image_size[0], image_size[1]
+        ph = ((h - 1) // 64 + 1) * 64 - h  # TODO rewrite
+        ph = int(ph / 2)
+        pw = ((w - 1) // 64 + 1) * 64 - w
+        pw = int(pw / 2)
+        img1 = np.pad(img1, ((ph, ph), (pw, pw), (0, 0)), "constant", constant_values=0)
+        img2 = np.pad(img2, ((ph, ph), (pw, pw), (0, 0)), "constant", constant_values=0)
 
         images = [img1, img2]
         # if self.is_cropped:

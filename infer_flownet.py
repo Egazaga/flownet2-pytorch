@@ -25,7 +25,7 @@ global param_copy
 
 def infer_flownet(in_path, out_path, reverse):
     args = SimpleNamespace(
-        model="FlowNet2",
+        model="FlowNet2CSS",
         reverse=reverse,
         start_epoch=1,
         total_epochs=10000,
@@ -52,7 +52,7 @@ def infer_flownet(in_path, out_path, reverse):
         inference_batch_size=1,
         inference_n_batches=-1,
         save_flow=True,
-        resume='./FlowNet2_checkpoint.pth.tar',
+        resume='./FlowNet2-CSS_checkpoint.pth.tar',
         log_frequency=1,
         skip_training=False,
         skip_validation=False,
@@ -65,7 +65,7 @@ def infer_flownet(in_path, out_path, reverse):
         validation_dataset='MpiSintelClean',
         inference_dataset='MpiSintelClean',
         IGNORE=False)
-
+    print(args.in_path)
     main_dir = os.path.dirname(os.path.realpath(__file__))
     os.chdir(main_dir)
 
@@ -211,7 +211,7 @@ def infer_flownet(in_path, out_path, reverse):
     def inference(args, data_loader, model, offset=0):
         model.eval()
         if args.save_flow or args.render_validation:
-            flow_folder = "./output/flo_rev" if args.reverse else "./output/flo"
+            flow_folder = out_path # "./output/flo_rev" if args.reverse else "./output/flo"
             if not os.path.exists(flow_folder):
                 os.makedirs(flow_folder)
 
