@@ -4,6 +4,7 @@ import argparse
 import os
 import subprocess
 from os.path import *
+from types import SimpleNamespace
 
 import colorama
 import numpy as np
@@ -24,76 +25,47 @@ global param_copy
 
 def infer_flownet(in_path, out_path, reverse):
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('--model', default="FlowNet2")
-    parser.add_argument('--reverse', action='store_true', default=reverse)
-    parser.add_argument('--start_epoch', type=int, default=1)
-    parser.add_argument('--total_epochs', type=int, default=10000)
-    parser.add_argument('--batch_size', '-b', type=int, default=8, help="Batch size")
-    parser.add_argument('--train_n_batches', type=int, default=-1,
-                        help='Number of min-batches per epoch. If < 0, it will be determined by training_dataloader')
-    parser.add_argument('--crop_size', type=int, nargs='+', default=[256, 256],
-                        help="Spatial dimension to crop training samples for training")
-    parser.add_argument('--gradient_clip', type=float, default=None)
-    parser.add_argument('--schedule_lr_frequency', type=int, default=0,
-                        help='in number of iterations (0 for no schedule)')
-    parser.add_argument('--schedule_lr_fraction', type=float, default=10)
-    parser.add_argument("--rgb_max", type=float, default=255.)
-
-    parser.add_argument('--number_workers', '-nw', '--num_workers', type=int, default=8)
-    parser.add_argument('--number_gpus', '-ng', type=int, default=-1, help='number of GPUs to use')
-    parser.add_argument('--no_cuda', action='store_true')
-
-    parser.add_argument('--seed', type=int, default=1)
-    parser.add_argument('--name', default='run', type=str, help='a name to append to the save directory')
-    parser.add_argument('--in_path', default=in_path, type=str)
-    parser.add_argument('--save', '-s', default=out_path, type=str, help='directory for saving')
-
-    parser.add_argument('--validation_frequency', type=int, default=5, help='validate every n epochs')
-    parser.add_argument('--validation_n_batches', type=int, default=-1)
-    parser.add_argument('--render_validation', action='store_true',
-                        help='run inference (save flows to file) and every validation_frequency epoch')
-
-    parser.add_argument('--inference', default=True)
-    parser.add_argument('--inference_visualize', action='store_true',
-                        help="visualize the optical flow during inference")
-    parser.add_argument('--inference_size', type=int, nargs='+', default=[-1, -1],
-                        help='spatial size divisible by 64. default (-1,-1) - largest possible valid size would be used')
-    parser.add_argument('--inference_batch_size', type=int, default=1)
-    parser.add_argument('--inference_n_batches', type=int, default=-1)
-    parser.add_argument('--save_flow', default=True)
-
-    parser.add_argument('--resume', default='./FlowNet2_checkpoint.pth.tar', type=str, metavar='PATH',
-                        help='path to latest checkpoint (default: none)')
-    parser.add_argument('--log_frequency', '--summ_iter', type=int, default=1, help="Log every n batches")
-
-    parser.add_argument('--skip_training', action='store_true')
-    parser.add_argument('--skip_validation', action='store_true')
-
-    parser.add_argument('--fp16', action='store_true', help='Run model in pseudo-fp16 mode (fp16 storage fp32 math).')
-    parser.add_argument('--fp16_scale', type=float, default=1024.,
-                        help='Loss scaling, positive power of 2 values can improve fp16 convergence.')
-
-    tools.add_arguments_for_module(parser, models, argument_for_class='model', default='FlowNet2')
-
-    tools.add_arguments_for_module(parser, losses, argument_for_class='loss', default='L1Loss')
-
-    tools.add_arguments_for_module(parser, torch.optim, argument_for_class='optimizer', default='Adam',
-                                   skip_params=['params'])
-
-    tools.add_arguments_for_module(parser, datasets, argument_for_class='training_dataset', default='MpiSintelFinal',
-                                   skip_params=['is_cropped'],
-                                   parameter_defaults={'root': './MPI-Sintel/flow/training'})
-
-    tools.add_arguments_for_module(parser, datasets, argument_for_class='validation_dataset', default='MpiSintelClean',
-                                   skip_params=['is_cropped'],
-                                   parameter_defaults={'root': './MPI-Sintel/flow/training',
-                                                       'replicates': 1})
-
-    tools.add_arguments_for_module(parser, datasets, argument_for_class='inference_dataset', default='MpiSintelClean',
-                                   skip_params=['is_cropped'],
-                                   parameter_defaults={'root': './MPI-Sintel/flow/training',
-                                                       'replicates': 1})
+    args = SimpleNamespace(
+        model="FlowNet2",
+        reverse=reverse,
+        start_epoch=1,
+        total_epochs=10000,
+        batch_size=8,
+        train_n_batches=-1,
+        crop_size=[256, 256],
+        gradient_clip=None,
+        schedule_lr_frequency=0,
+        schedule_lr_fraction=10,
+        rgb_max=255.,
+        number_workers=8,
+        number_gpus=-1,
+        no_cuda=False,
+        seed=1,
+        name='run',
+        in_path=in_path,
+        save=out_path,
+        validation_frequency=5,
+        validation_n_batches=-1,
+        render_validation=False,
+        inference=True,
+        inference_visualize=False,
+        inference_size=[-1, -1],
+        inference_batch_size=1,
+        inference_n_batches=-1,
+        save_flow=True,
+        resume='./FlowNet2_checkpoint.pth.tar',
+        log_frequency=1,
+        skip_training=False,
+        skip_validation=False,
+        fp16=False,
+        fp16_scale=1024.,
+        loss='L1Loss',
+        optimizer='Adam',
+        training_dataset='MpiSintelFinal',
+        root='./MPI-Sintel/flow/training',
+        validation_dataset='MpiSintelClean',
+        inference_dataset='MpiSintelClean',
+        IGNORE=False)
 
     main_dir = os.path.dirname(os.path.realpath(__file__))
     os.chdir(main_dir)
@@ -102,10 +74,6 @@ def infer_flownet(in_path, out_path, reverse):
     with tools.TimerBlock("Parsing Arguments") as block:
         args = parser.parse_args()
         if args.number_gpus < 0: args.number_gpus = torch.cuda.device_count()
-
-        # Get argument defaults (hastag #thisisahack)
-        parser.add_argument('--IGNORE', action='store_true')
-        defaults = vars(parser.parse_args(['--IGNORE']))
 
         # Print all arguments, color the non-defaults
         for argument, value in sorted(vars(args).items()):
@@ -177,7 +145,6 @@ def infer_flownet(in_path, out_path, reverse):
                 else:
                     return loss_values, output
 
-
         model_and_loss = ModelAndLoss(args)
 
         block.log('Effective Batch Size: {}'.format(args.effective_batch_size))
@@ -243,7 +210,6 @@ def infer_flownet(in_path, out_path, reverse):
     for argument, value in sorted(vars(args).items()):
         block.log2file(args.log_file, '{}: {}'.format(argument, value))
 
-
     # Reusable function for inference
     def inference(args, data_loader, model, offset=0):
         model.eval()
@@ -308,7 +274,6 @@ def infer_flownet(in_path, out_path, reverse):
         progress.close()
 
         return
-
 
     # Primary epoch loop
     best_err = 1e8
