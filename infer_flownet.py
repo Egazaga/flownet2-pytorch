@@ -24,7 +24,6 @@ global param_copy
 
 
 def infer_flownet(in_path, out_path, reverse):
-    parser = argparse.ArgumentParser()
     args = SimpleNamespace(
         model="FlowNet2",
         reverse=reverse,
@@ -72,7 +71,6 @@ def infer_flownet(in_path, out_path, reverse):
 
     # Parse the official arguments
     with tools.TimerBlock("Parsing Arguments") as block:
-        args = parser.parse_args()
         if args.number_gpus < 0: args.number_gpus = torch.cuda.device_count()
 
         # Print all arguments, color the non-defaults
