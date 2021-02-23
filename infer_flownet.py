@@ -229,6 +229,7 @@ def infer_flownet(in_path, out_path, reverse):
 
         statistics = []
         total_loss = 0
+        ph, pw = inference_dataset.ph, inference_dataset.pw
         for batch_idx, (data, target) in enumerate(progress):
             if args.cuda:
                 data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
@@ -253,7 +254,7 @@ def infer_flownet(in_path, out_path, reverse):
             if args.save_flow or args.render_validation:
                 for i in range(args.inference_batch_size):
                     _pflow = output[i].data.cpu().numpy().transpose(1, 2, 0)
-                    _pflow = _pflow[4:-4, :, :]
+                    _pflow = _pflow[ph:-ph, pw:-pw, :]
                     flow_utils.writeFlow(join(flow_folder, '%06d.flo' % (batch_idx * args.inference_batch_size + i)),
                                          _pflow)
 

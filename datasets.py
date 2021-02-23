@@ -346,6 +346,8 @@ class ImagesFromFolder(data.Dataset):
         self.crop_size = args.crop_size
         self.render_size = args.inference_size
         self.replicates = replicates
+        self.ph = 0
+        self.pw = 0
 
         images = sorted(glob(join(root, '*.' + iext)), reverse=is_reversed)
         self.image_list = []
@@ -376,6 +378,8 @@ class ImagesFromFolder(data.Dataset):
         ph = int(ph / 2)
         pw = ((w - 1) // 64 + 1) * 64 - w
         pw = int(pw / 2)
+        self.ph = ph
+        self.pw = pw
         img1 = np.pad(img1, ((ph, ph), (pw, pw), (0, 0)), "constant", constant_values=0)
         img2 = np.pad(img2, ((ph, ph), (pw, pw), (0, 0)), "constant", constant_values=0)
 
