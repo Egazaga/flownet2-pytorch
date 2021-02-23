@@ -16,17 +16,22 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from . import datasets, losses, models
-from .utils import flow_utils, tools
+try:
+    from . import datasets, losses, models
+    from .utils import flow_utils, tools
+except:
+    import datasets, losses, models
+    from utils import flow_utils, tools
 
 # fp32 copy of parameters for update
 global param_copy
 
 
-def infer_flownet(in_path, out_path, reverse):
+def infer_flownet(in_path, out_path, reverse, downscale_factor=1):
     args = SimpleNamespace(
-        model="FlowNet2CSS",
+        model="FlowNet2",
         reverse=reverse,
+        downscale_factor=downscale_factor,
         start_epoch=1,
         total_epochs=10000,
         batch_size=8,
@@ -47,12 +52,12 @@ def infer_flownet(in_path, out_path, reverse):
         validation_n_batches=-1,
         render_validation=False,
         inference=True,
-        inference_visualize=False,
+        inference_visualize=True,
         inference_size=[-1, -1],
         inference_batch_size=1,
         inference_n_batches=-1,
         save_flow=True,
-        resume='./FlowNet2-CSS_checkpoint.pth.tar',
+        resume='./FlowNet2_checkpoint.pth.tar',
         log_frequency=1,
         skip_training=False,
         skip_validation=False,
@@ -211,13 +216,13 @@ def infer_flownet(in_path, out_path, reverse):
     def inference(args, data_loader, model, offset=0):
         model.eval()
         if args.save_flow or args.render_validation:
-            flow_folder = out_path # "./output/flo_rev" if args.reverse else "./output/flo"
+            flow_folder = out_path  # "./output/flo_rev" if args.reverse else "./output/flo"
             if not os.path.exists(flow_folder):
                 os.makedirs(flow_folder)
 
         # visualization folder
         if args.inference_visualize:
-            flow_vis_folder = "./output/png_rev" if args.reverse else "./output/png"
+            flow_vis_folder = "./out/png_rev" if args.reverse else "./out/png"
             if not os.path.exists(flow_vis_folder):
                 os.makedirs(flow_vis_folder)
 
@@ -254,7 +259,11 @@ def infer_flownet(in_path, out_path, reverse):
             if args.save_flow or args.render_validation:
                 for i in range(args.inference_batch_size):
                     _pflow = output[i].data.cpu().numpy().transpose(1, 2, 0)
-                    _pflow = _pflow[ph:-ph, pw:-pw, :]
+                    if ph != 0:
+                        _pflow = _pflow[ph:-ph, :, :]
+                    if pw != 0:
+                        _pflow = _pflow[:, pw:-pw, :]
+
                     flow_utils.writeFlow(join(flow_folder, '%06d.flo' % (batch_idx * args.inference_batch_size + i)),
                                          _pflow)
 
@@ -284,3 +293,7 @@ def infer_flownet(in_path, out_path, reverse):
         inference(args=args, data_loader=inference_loader, model=model_and_loss, offset=offset)
         offset += 1
     print("\n")
+
+
+if __name__ == '__main__':
+    infer_flownet("C:\\Users\\ZG\\Desktop\\masks", "./out", reverse=False)

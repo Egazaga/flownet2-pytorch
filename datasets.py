@@ -1,12 +1,16 @@
+import random
+from glob import glob
+from os.path import *
+
+import numpy as np
+import cv2
 import torch
 import torch.utils.data as data
 
-import random
-from os.path import *
-import numpy as np
-
-from glob import glob
-from .utils import frame_utils as frame_utils
+try:
+    from .utils import frame_utils
+except:
+    from utils import frame_utils
 
 
 # from scipy.misc import imread, imresize
@@ -374,6 +378,10 @@ class ImagesFromFolder(data.Dataset):
         img2 = frame_utils.read_gen(self.image_list[index][1])
         image_size = img1.shape[:2]
         h, w = image_size[0], image_size[1]
+        h, w = int(h/self.args.downscale_factor), int(w/self.args.downscale_factor)
+        img1 = cv2.resize(img1, dsize=(h, w), interpolation=cv2.INTER_CUBIC)
+        img2 = cv2.resize(img2, dsize=(h, w), interpolation=cv2.INTER_CUBIC)
+
         ph = ((h - 1) // 64 + 1) * 64 - h  # TODO rewrite
         ph = int(ph / 2)
         pw = ((w - 1) // 64 + 1) * 64 - w
@@ -384,11 +392,6 @@ class ImagesFromFolder(data.Dataset):
         img2 = np.pad(img2, ((ph, ph), (pw, pw), (0, 0)), "constant", constant_values=0)
 
         images = [img1, img2]
-        # if self.is_cropped:
-        #     cropper = StaticRandomCrop(image_size, self.crop_size)
-        # else:
-        #     cropper = StaticCenterCrop(image_size, self.render_size)
-        # images = list(map(cropper, images))
 
         images = np.array(images).transpose(3, 0, 1, 2)
         images = torch.from_numpy(images.astype(np.float32))
@@ -397,31 +400,3 @@ class ImagesFromFolder(data.Dataset):
 
     def __len__(self):
         return self.size * self.replicates
-
-
-'''
-import argparse
-import sys, os
-import importlib
-from scipy.misc import imsave
-import numpy as np
-
-import datasets
-reload(datasets)
-
-parser = argparse.ArgumentParser()
-args = parser.parse_args()
-args.inference_size = [1080, 1920]
-args.crop_size = [384, 512]
-args.effective_batch_size = 1
-
-index = 500
-v_dataset = datasets.MpiSintelClean(args, True, root='../MPI-Sintel/flow/training')
-a, b = v_dataset[index]
-im1 = a[0].numpy()[:,0,:,:].transpose(1,2,0)
-im2 = a[0].numpy()[:,1,:,:].transpose(1,2,0)
-imsave('./img1.png', im1)
-imsave('./img2.png', im2)
-flow_utils.writeFlow('./flow.flo', b[0].numpy().transpose(1,2,0))
-
-'''
