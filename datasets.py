@@ -2,8 +2,8 @@ import random
 from glob import glob
 from os.path import *
 
-import numpy as np
 import cv2
+import numpy as np
 import torch
 import torch.utils.data as data
 
@@ -378,13 +378,15 @@ class ImagesFromFolder(data.Dataset):
         img2 = frame_utils.read_gen(self.image_list[index][1])
         image_size = img1.shape[:2]
         h, w = image_size[0], image_size[1]
-        h, w = int(h/self.args.downscale_factor), int(w/self.args.downscale_factor)
-        img1 = cv2.resize(img1, dsize=(h, w), interpolation=cv2.INTER_CUBIC)
-        img2 = cv2.resize(img2, dsize=(h, w), interpolation=cv2.INTER_CUBIC)
+        h, w = int(h / self.args.downscale_factor), int(w / self.args.downscale_factor)
+        img1 = cv2.resize(img1, dsize=(w, h), interpolation=cv2.INTER_CUBIC)
+        img2 = cv2.resize(img2, dsize=(w, h), interpolation=cv2.INTER_CUBIC)
 
-        ph = ((h - 1) // 64 + 1) * 64 - h  # TODO rewrite
+        ph = (h + 63) // 64 * 64 - h
+        pw = (w + 63) // 64 * 64 - w
+        if ph % 2 or pw % 2:
+            raise ValueError("Height or width of resized image is odd")
         ph = int(ph / 2)
-        pw = ((w - 1) // 64 + 1) * 64 - w
         pw = int(pw / 2)
         self.ph = ph
         self.pw = pw
