@@ -222,7 +222,7 @@ def infer_flownet(in_path, out_path, reverse, downscale_factor=1):
 
         # visualization folder
         if args.inference_visualize:
-            flow_vis_folder = "./out/png_rev" if args.reverse else "./out/png"
+            flow_vis_folder = out_path + "/" + "png/"
             if not os.path.exists(flow_vis_folder):
                 os.makedirs(flow_vis_folder)
 
@@ -263,7 +263,6 @@ def infer_flownet(in_path, out_path, reverse, downscale_factor=1):
                         _pflow = _pflow[ph:-ph, :, :]
                     if pw != 0:
                         _pflow = _pflow[:, pw:-pw, :]
-
                     flow_utils.writeFlow(join(flow_folder, '%06d.flo' % (batch_idx * args.inference_batch_size + i)),
                                          _pflow)
 
