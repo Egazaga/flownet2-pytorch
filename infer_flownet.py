@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import argparse
 import os
 import subprocess
 from os.path import *
@@ -11,7 +10,6 @@ import numpy as np
 import setproctitle
 import torch
 import torch.nn as nn
-from tensorboardX import SummaryWriter
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -78,19 +76,12 @@ def infer_flownet(in_path, out_path, reverse, downscale_factor=1):
     with tools.TimerBlock("Parsing Arguments") as block:
         if args.number_gpus < 0: args.number_gpus = torch.cuda.device_count()
 
-        # Print all arguments, color the non-defaults
-        for argument, value in sorted(vars(args).items()):
-            reset = colorama.Style.RESET_ALL
-            color = colorama.Fore.MAGENTA
-            block.log('{}{}: {}{}'.format(color, argument, value, reset))
-
         args.model_class = tools.module_to_dict(models)[args.model]
         args.optimizer_class = tools.module_to_dict(torch.optim)[args.optimizer]
         args.loss_class = tools.module_to_dict(losses)[args.loss]
 
         args.cuda = not args.no_cuda and torch.cuda.is_available()
         args.current_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).rstrip()
-        args.log_file = join(args.save, 'args.txt')
 
         # dict to collect activation gradients (for training debug purpose)
         args.grads = {}
@@ -149,68 +140,33 @@ def infer_flownet(in_path, out_path, reverse, downscale_factor=1):
 
         model_and_loss = ModelAndLoss(args)
 
-        block.log('Effective Batch Size: {}'.format(args.effective_batch_size))
-        block.log('Number of parameters: {}'.format(
-            sum([p.data.nelement() if p.requires_grad else 0 for p in model_and_loss.parameters()])))
-
         # assing to cuda or wrap with dataparallel, model and loss
         if args.cuda and (args.number_gpus > 0) and args.fp16:
-            block.log('Parallelizing')
             model_and_loss = nn.parallel.DataParallel(model_and_loss, device_ids=list(range(args.number_gpus)))
-
-            block.log('Initializing CUDA')
             model_and_loss = model_and_loss.cuda().half()
             torch.cuda.manual_seed(args.seed)
-            param_copy = [param.clone().type(torch.cuda.FloatTensor).detach() for param in model_and_loss.parameters()]
-
         elif args.cuda and args.number_gpus > 0:
-            block.log('Initializing CUDA')
             model_and_loss = model_and_loss.cuda()
-            block.log('Parallelizing')
             model_and_loss = nn.parallel.DataParallel(model_and_loss, device_ids=list(range(args.number_gpus)))
             torch.cuda.manual_seed(args.seed)
-
         else:
             block.log('CUDA not being used')
             torch.manual_seed(args.seed)
 
         # Load weights if needed, otherwise randomly initialize
         if args.resume and os.path.isfile(args.resume):
-            block.log("Loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             if not args.inference:
                 args.start_epoch = checkpoint['epoch']
-            best_err = checkpoint['best_EPE']
             model_and_loss.module.model.load_state_dict(checkpoint['state_dict'])
-            block.log("Loaded checkpoint '{}' (at epoch {})".format(args.resume, checkpoint['epoch']))
-
         elif args.resume and args.inference:
             block.log("No checkpoint found at '{}'".format(args.resume))
             quit()
-
         else:
             block.log("Random initialization")
 
-        block.log("Initializing save directory: {}".format(args.save))
         if not os.path.exists(args.save):
             os.makedirs(args.save)
-
-        train_logger = SummaryWriter(log_dir=os.path.join(args.save, 'train'), comment='training')
-        validation_logger = SummaryWriter(log_dir=os.path.join(args.save, 'validation'), comment='validation')
-
-    # Dynamically load the optimizer with parameters passed in via "--optimizer_[param]=[value]" arguments
-    with tools.TimerBlock("Initializing {} Optimizer".format(args.optimizer)) as block:
-        kwargs = tools.kwargs_from_args(args, 'optimizer')
-        if args.fp16:
-            optimizer = args.optimizer_class([p for p in param_copy if p.requires_grad], **kwargs)
-        else:
-            optimizer = args.optimizer_class([p for p in model_and_loss.parameters() if p.requires_grad], **kwargs)
-        for param, default in list(kwargs.items()):
-            block.log("{} = {} ({})".format(param, default, type(default)))
-
-    # Log all arguments to file
-    for argument, value in sorted(vars(args).items()):
-        block.log2file(args.log_file, '{}: {}'.format(argument, value))
 
     # Reusable function for inference
     def inference(args, data_loader, model, offset=0):
@@ -251,9 +207,6 @@ def infer_flownet(in_path, out_path, reverse, downscale_factor=1):
             total_loss += loss_val.item()
             loss_values = [v.item() for v in losses]
 
-            # gather loss_labels, direct return leads to recursion limit error as it looks for variables to gather'
-            loss_labels = list(model.module.loss.loss_labels)
-
             statistics.append(loss_values)
             # import IPython; IPython.embed()
             if args.save_flow or args.render_validation:
@@ -273,22 +226,16 @@ def infer_flownet(in_path, out_path, reverse, downscale_factor=1):
                             flow_vis_folder)
 
             progress.update(1)
-
             if batch_idx == (args.inference_n_batches - 1):
                 break
-
         progress.close()
-
         return
 
-    # Primary epoch loop
-    best_err = 1e8
     progress = tqdm(list(range(args.start_epoch, args.total_epochs + 1)), miniters=1, ncols=100,
                     desc='Overall Progress', leave=True, position=0)
     offset = 1
-    global_iteration = 0
 
-    for epoch in progress:
+    for _ in progress:
         inference(args=args, data_loader=inference_loader, model=model_and_loss, offset=offset)
         offset += 1
     print("\n")

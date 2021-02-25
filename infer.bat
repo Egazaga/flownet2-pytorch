@@ -1,1 +1,0 @@
-python main.py --inference --model FlowNet2 --save_flow --save ./output --in_path D:/Politech/Prog/Python/video-enchansment/pytorch-deeplab-xception/out --resume ./FlowNet2_checkpoint.pth.tar --reverse
